@@ -16,13 +16,24 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.SupportMapFragment
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.tasks.Task
 
-class MainActivity : BaseActivity() {
+class MainActivity : BaseActivity(), OnMapReadyCallback {
+    lateinit var map: SupportMapFragment
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        map = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
+        map.getMapAsync(this)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
@@ -48,6 +59,23 @@ class MainActivity : BaseActivity() {
                     Toast.makeText(this,"Access Denied",Toast.LENGTH_LONG).show()
                 }
             }
+
+    var googleMap: GoogleMap?=null
+    override fun onMapReady(googleMap: GoogleMap?) {
+      this.googleMap = googleMap
+    }
+    var userMarker: Marker?=null
+    fun drawerUser(location: Location){
+        val markerOptions = MarkerOptions()
+            .position(LatLng(location.latitude,location.longitude))
+
+        if (userMarker==null){
+            userMarker = googleMap?.addMarker(markerOptions)
+        }else{
+            userMarker?.position = LatLng(location.latitude,location.longitude)
+        }
+        googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude,location.longitude),20f))
+    }
 
     private fun requestedPermissionGranted() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.ACCESS_FINE_LOCATION)){
@@ -122,6 +150,7 @@ class MainActivity : BaseActivity() {
             for (location in result.locations){
                 // Update UI with location data
                 // ...
+                drawerUser(location)
                 Log.e("New Location",""+location.longitude+""+location.latitude)
             }
         }
