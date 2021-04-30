@@ -3,17 +3,20 @@ package com.example.permissionmap
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.DialogInterface
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.*
+import com.google.android.gms.tasks.Task
 
 class MainActivity : BaseActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -62,15 +65,69 @@ class MainActivity : BaseActivity() {
 
     @SuppressLint("MissingPermission")
     private fun showUserLocation() {
-        fusedLocationClient.lastLocation
-                .addOnSuccessListener { location : Location? ->
-                    if (location!=null){
-                        Log.e("lat",""+location.latitude)
-                        Log.e("long",""+location.longitude)
-                    }
-                }
+        changeUserLocation()
+//        fusedLocationClient.lastLocation
+//                .addOnSuccessListener { location : Location? ->
+//                    if (location!=null){
+//                        Log.e("lat",""+location.latitude)
+//                        Log.e("long",""+location.longitude)
+//                    }
+//                }
         Toast.makeText(this,"Show User Location",Toast.LENGTH_LONG).show()
     }
+
+    val locationRequest = LocationRequest.create()?.apply {
+        interval = 10000
+        fastestInterval = 5000
+        priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+    }
+    private fun changeUserLocation() {
+
+        val builder = LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest)
+        val client: SettingsClient = LocationServices.getSettingsClient(this)
+        val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
+        task.addOnSuccessListener { locationSettingsResponse ->
+            // All location settings are satisfied. The client can initialize
+            // location requests here.
+            // ...
+            startTrackUser()
+        }
+
+        task.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException){
+                // Location settings are not satisfied, but this can be fixed
+                // by showing the user a dialog.
+                try {
+                    // Show the dialog by calling startResolutionForResult(),
+                    // and check the result in onActivityResult().
+                    exception.startResolutionForResult(this@MainActivity,
+                            REQUEST_CHECK_SETTINGS)
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    // Ignore the error.
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startTrackUser() {
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+                locationCallback,
+                Looper.getMainLooper())
+    }
+    val locationCallback = object :LocationCallback(){
+        override fun onLocationResult(result: LocationResult) {
+            super.onLocationResult(result)
+            for (location in result.locations){
+                // Update UI with location data
+                // ...
+                Log.e("New Location",""+location.longitude+""+location.latitude)
+            }
+        }
+    }
+
+    val  REQUEST_CHECK_SETTINGS = 200
 
     private fun isPermissionGranted(): Boolean {
         return ContextCompat.checkSelfPermission(this,
